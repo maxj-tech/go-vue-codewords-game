@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"errors"
+	"github.com/google/uuid"
+	"strings"
+)
 
 type Rolle int
 
@@ -10,15 +14,20 @@ const (
 )
 
 type Spieler struct {
-	Id    uuid.UUID
+	id    uuid.UUID
 	Name  string
 	Rolle Rolle
 }
 
-func NewSpieler(name string, rolle Rolle) Spieler {
+func NewSpieler(name string, rolle Rolle) (Spieler, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return Spieler{}, errors.New("name cannot be empty or whitespace")
+	}
+
 	return Spieler{
-		Id:    uuid.New(),
+		id:    uuid.New(),
 		Name:  name,
 		Rolle: rolle,
-	}
+	}, nil
 }
