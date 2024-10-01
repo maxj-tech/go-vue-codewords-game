@@ -31,3 +31,7 @@ func NewSpieler(name string, rolle Rolle) (Spieler, error) {
 		Rolle: rolle,
 	}, nil
 }
+
+func (s Spieler) ID() uuid.UUID {
+	return s.id
+}
