@@ -63,7 +63,7 @@ func (m *Manager) addClient(client *Client) {
 
 	// Start the read / write processes
 	go client.readMessages()
-	// go client.writeMessages()
+	go client.writeMessages()
 }
 
 // removeClient will remove the client and clean up
