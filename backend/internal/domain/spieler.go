@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 	"strings"
 )
@@ -22,7 +23,11 @@ type Spieler struct {
 func NewSpieler(name string, rolle Rolle) (Spieler, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return Spieler{}, errors.New("name cannot be empty or whitespace")
+		return Spieler{}, errors.New("Ungültiger Name")
+	}
+
+	if rolle != Chef && rolle != Ermittler {
+		return Spieler{}, errors.New("Ungültige Rolle")
 	}
 
 	return Spieler{
@@ -34,4 +39,8 @@ func NewSpieler(name string, rolle Rolle) (Spieler, error) {
 
 func (s Spieler) ID() uuid.UUID {
 	return s.id
+}
+
+func (s Spieler) String() string {
+	return fmt.Sprintf("%s (ID: %s, Rolle: %d)", s.Name, s.id, s.Rolle)
 }

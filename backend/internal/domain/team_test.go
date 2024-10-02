@@ -55,3 +55,15 @@ func TestNewTeamErrorDoppelterErmittler(t *testing.T) {
 		t.Fatalf("expected an error, but got none")
 	}
 }
+
+func TestNewTeamErrorUngueltigeFarbe(t *testing.T) {
+	chef, _ := NewSpieler("Chef", Chef)
+	ermittler, _ := NewSpieler("Ermittler", Ermittler)
+	farben := []int{-1, 2, 42, 1337}
+	for _, farbe := range farben {
+		_, err := NewTeam(Teamfarbe(farbe), chef, []Spieler{ermittler})
+		if err == nil {
+			t.Fatalf("expected error for invalid Teamfarbe %v, but didn't get one", farbe)
+		}
+	}
+}

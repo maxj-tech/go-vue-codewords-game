@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestNeuerSpieler(t *testing.T) {
+func TestNewSpieler(t *testing.T) {
 	// Teste, ob ein neuer Spieler korrekt erstellt wird
 	spieler, _ := NewSpieler("Spieler1", Ermittler)
 
@@ -29,13 +29,23 @@ func TestNeuerSpieler(t *testing.T) {
 	}
 }
 
-func TestNeuerSpielerMitLeeremNamen(t *testing.T) {
+func TestNewSpielerErrorLeererName(t *testing.T) {
 	tests := []string{"", " ", "\t", "\n"}
 
 	for _, name := range tests {
 		spieler, err := NewSpieler(name, Chef)
 		if err == nil || spieler.Name != "" {
-			t.Fatalf("expected error for empty or whitespace name, got %v and name %s", err, spieler.Name)
+			t.Fatalf("expected error for empty or whitespace name, but didn't get one for name %s", name)
+		}
+	}
+}
+
+func TestNewSpielerErrorUngueltigeRolle(t *testing.T) {
+	tests := []int{-1, 2, 42, 1337}
+	for _, rolle := range tests {
+		spieler, err := NewSpieler("Spieler", Rolle(rolle))
+		if err == nil || spieler.Name != "" {
+			t.Fatalf("expected error for invalid Rolle %v, but didn't get one", rolle)
 		}
 	}
 }
