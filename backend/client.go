@@ -4,6 +4,16 @@ import (
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
+	"time"
+)
+
+var (
+	pongWait = 10 * time.Second // how long we will await a pong response from client
+
+	// pingInterval has to be less than pongWait, We cant multiply by 0.9 to get 90% of time
+	// Because that can make decimals, so instead *9 / 10 to get 90%
+	// The reason why it has to be less than PingRequency is becuase otherwise it will send a new Ping before getting response
+	pingInterval = (pongWait * 9) / 10
 )
 
 // ClientList is a map used to help manage a map of clients
@@ -37,6 +47,15 @@ func (c *Client) readMessages() {
 		log.Println("client.readMessages(): Closing connection")
 		c.manager.removeClient(c)
 	}()
+
+	// Configure wait time for Pong respons: current time + pongWait
+	// This has to be done here to set the first initial timer.
+	if err := c.connection.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
+		log.Println(err)
+		return
+	}
+	// Configure how to handle Pong responses
+	c.connection.SetPongHandler(c.pongHandler)
 
 	// Loop Forever
 	for {
@@ -74,10 +93,18 @@ func (c *Client) readMessages() {
 	}
 }
 
+func (c *Client) pongHandler(pongMsg string) error {
+	log.Println("client.pongHandler(): pong")
+	return c.connection.SetReadDeadline(time.Now().Add(pongWait)) // Current time + Pong Wait time
+}
+
 // writeMessages is a process that listens for new messages to output to the Client
 func (c *Client) writeMessages() {
 
+	ticker := time.NewTicker(pingInterval) // ticker that will send a ping every pingInterval
+
 	defer func() { // Graceful close if this triggers a closing
+		ticker.Stop()
 		log.Println("client.writeMessages(): Closing connection")
 		c.manager.removeClient(c)
 	}()
@@ -101,9 +128,17 @@ func (c *Client) writeMessages() {
 			}
 			// Write a Regular text message to the connection
 			if err := c.connection.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Println("client.writeMessages(): failed to send message, ", err)
+				log.Println("client.writeMessages(): failed to send TextMessage", err)
 			}
-			log.Println("client.writeMessages(): marshalled message sent: ", msg)
+			log.Println("client.writeMessages(): marshalled message sent", msg)
+
+		case <-ticker.C:
+			log.Println("client.writeMessages(): ping")
+			// Send the Ping
+			if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+				log.Println("client.writeMessages(): failed to send PingMessage", err)
+				return // return to break this goroutine triggering cleanup
+			}
 		}
 
 	}
