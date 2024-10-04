@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/gorilla/websocket"
 	"log"
 )
@@ -16,8 +17,8 @@ type Client struct {
 	// manager is the manager used to manage the client
 	manager *Manager
 
-	// egress is used to avoid concurrent writes on the WebSocket
-	egress chan []byte
+	// egress is used to avoid concurrent writes on the WebSocket connection
+	egress chan GameMessage
 }
 
 // NewClient is used to initialize a new Client with all required values initialized
@@ -25,7 +26,7 @@ func NewClient(conn *websocket.Conn, manager *Manager) *Client {
 	return &Client{
 		connection: conn,
 		manager:    manager,
-		egress:     make(chan []byte),
+		egress:     make(chan GameMessage),
 	}
 }
 
@@ -33,6 +34,7 @@ func NewClient(conn *websocket.Conn, manager *Manager) *Client {
 // This is supposed to be run as a goroutine
 func (c *Client) readMessages() {
 	defer func() { // Graceful Close the Connection once this function is done
+		log.Println("client.readMessages(): Closing connection")
 		c.manager.removeClient(c)
 	}()
 
@@ -46,15 +48,28 @@ func (c *Client) readMessages() {
 			// If Connection is closed, we will receive an error here
 			// We only want to log strange errors, but not simple disconnects
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("error reading message: %v", err)
+				log.Printf("client.readMessages(): error reading message: %v", err)
 			}
 			break // Break the loop to close conn & Cleanup
 		}
-		log.Printf("MessageType: %d, Payload: %s \n", messageType, string(payload))
 
-		// fixme remove this - just to test that WriteMessages works as intended
-		for wsclient := range c.manager.clients {
-			wsclient.egress <- payload
+		log.Printf("client.readMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
+
+		// Marshal incoming data into a GameMessage
+		var request GameMessage
+		if err := json.Unmarshal(payload, &request); err != nil {
+			log.Printf("client.readMessages(): error marshalling message: %v", err)
+			break // fixme better avoid Breaking the connection here
+		}
+
+		// fixme remove this (just to test if the message is broadcasted to all clients)
+		//for client := range c.manager.clients {
+		//	client.egress <- request
+		//}
+
+		// Route the GameMessage
+		if err := c.manager.route(request, c); err != nil {
+			log.Println("client.readMessages(): Error handling GameMessage: ", err)
 		}
 	}
 }
@@ -63,6 +78,7 @@ func (c *Client) readMessages() {
 func (c *Client) writeMessages() {
 
 	defer func() { // Graceful close if this triggers a closing
+		log.Println("client.writeMessages(): Closing connection")
 		c.manager.removeClient(c)
 	}()
 
@@ -74,16 +90,20 @@ func (c *Client) writeMessages() {
 				// Manager has closed this connection channel, so communicate that to frontend
 				if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
 					// Log that the connection is closed and the reason
-					log.Println("connection closed: ", err)
+					log.Println("client.writeMessages(): connection closed: ", err)
 				}
-				// Return to close the goroutine
 				return
 			}
-			// Write a Regular text message to the connection
-			if err := c.connection.WriteMessage(websocket.TextMessage, message); err != nil {
-				log.Println(err)
+			msg, err := json.Marshal(message)
+			if err != nil {
+				log.Println("client.writeMessages(): error marshalling", err)
+				return // closes the connection, should we really
 			}
-			log.Println("sent message")
+			// Write a Regular text message to the connection
+			if err := c.connection.WriteMessage(websocket.TextMessage, msg); err != nil {
+				log.Println("client.writeMessages(): failed to send message, ", err)
+			}
+			log.Println("client.writeMessages(): marshalled message sent: ", msg)
 		}
 
 	}

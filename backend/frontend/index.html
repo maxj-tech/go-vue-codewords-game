@@ -5,12 +5,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>PP - Websockets</title>
+    <title>Codenames</title>
 </head>
 
 <body>
 <div class="center">
-    <h1>Amazing Chat Application</h1>
+    <h1>Codenames</h1>
     <h3 id="chat-header">Currently in chat: general</h3>
 
     <!--
@@ -26,17 +26,17 @@
     <!--
     Textarea to show messages from users
     -->
-    <textarea class="messagearea" id="chatmessages" readonly name="chatmessages" rows="4" cols="50"
-              placeholder="Welcome to the general chatroom, here messages from others will appear"></textarea>
+    <textarea class="message-area" id="chat-messages" readonly name="chat-messages" rows="4" cols="50"
+              placeholder="all received messages will appear here"></textarea>
 
     <br>
     <!--
     Chatroom-message form is used to send messages
     -->
-    <form id="chatroom-message">
-        <label for="message">Message:</label>
-        <input type="text" id="message" name="message"><br><br>
-        <input type="submit" value="Send message">
+    <form id="chat-message-form">
+        <label for="chat-message">Message:</label>
+        <input type="text" id="chat-message" name="chat-message"><br><br>
+        <input type="submit" value="Send">
     </form>
 </div>
 
@@ -47,6 +47,36 @@
 
     // selectedchat is by default General.
     var selectedchat = "general";
+
+    /**
+     * GameMessage is used to wrap all messages sent and received on the Websocket
+     * The type is used as a remote procedure call (RPC) to determine what to do with the payload
+     * */
+    class GameMessage {
+        constructor(type, payload) {
+            this.type = type;           // required
+            this.payload = payload;     // optional
+        }
+    }
+
+    /**
+     * routes GameMessages into their correct game message handler based on the type field
+     * */
+    function route(gameMessage) {
+        if (gameMessage.type === undefined) {
+            alert("route(): missing 'type'");
+            return;
+        }
+        switch (gameMessage.type) {
+            case "chat-message":
+                console.log("route(): new chat message, payload: " + gameMessage.payload);
+                break;
+            default:
+                alert("route(): unsupported message type");
+                break;
+        }
+
+    }
 
     /**
      * changeChatRoom will update the value of selectedchat
@@ -61,16 +91,27 @@
         return false;
     }
     /**
-     * sendMessage will send a new message onto the Websocket
+     * sendChatMessage will send a chat message onto the Websocket
      * */
-    function sendMessage() {
-        var newmessage = document.getElementById("message");
-        if (newmessage != null) {
-            console.log("sent: " + newmessage.value);
-            conn.send(newmessage.value);
+    function sendChatMessage() {
+        var chatMessage = document.getElementById("chat-message");
+        if (chatMessage != null) {
+            console.log("sendChatMessage(), sent: " + chatMessage.value);
+            sendGameMessage("chat-message", chatMessage.value)
         }
         return false;
     }
+
+    /**
+    * sendGameMessage
+    * messageType - the message type
+    * payload - the data payload
+    * */
+    function sendGameMessage(messageType, payload) {
+        const gameMessage = new GameMessage(messageType, payload);
+        conn.send(JSON.stringify(gameMessage));
+    }
+
     /**
      * Once the website loads, we want to apply listeners and connect to websocket
      * */
@@ -78,20 +119,23 @@
         // Apply our listener functions to the submit event on both forms
         // we do it this way to avoid redirects
         document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
-        document.getElementById("chatroom-message").onsubmit = sendMessage;
+        document.getElementById("chat-message-form").onsubmit = sendChatMessage;
 
         // Check if the browser supports WebSocket
         if (window["WebSocket"]) {
-            console.log("supports websockets");
+            console.log("window.onload(): supports websockets");
             // Connect to websocket
             conn = new WebSocket("ws://" + document.location.host + "/ws");
 
             // Add a listener to the onmessage event
             conn.onmessage = function(evt) {
-                console.log("received: " + evt.data);
+                console.log("conn.onmessage(): received: " + evt.data);
+                const eventData = JSON.parse(evt.data);
+                const gameMessage = Object.assign(new GameMessage, eventData);
+                route(gameMessage);
             }
         } else {
-            alert("Not supporting websockets");
+            alert("window.onload(): Not supporting websockets");
         }
     };
 </script>

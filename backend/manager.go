@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -16,28 +17,57 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}
+
+	ErrorMessageTypeNotSupported = errors.New("GameMessage type not supported")
 )
 
 // Manager is used to hold references to all Clients Registered, and Broadcasting etc
 type Manager struct {
 	clients ClientList
 
-	// Using a syncMutex here to be able to lcok state before editing clients
-	// Could also use Channels to block
+	// Using a syncMutex here to be able to lock state before editing clients (we could also use channels)
 	sync.RWMutex
+
+	// a map of message types to their respective game message handler functions
+	gameMessageHandlers map[string]GameMessageHandler
 }
 
 // NewManager is used to initalize all the values inside the manager
 func NewManager() *Manager {
-	return &Manager{
-		clients: make(ClientList),
+	m := &Manager{
+		clients:             make(ClientList),
+		gameMessageHandlers: make(map[string]GameMessageHandler),
+	}
+	m.setupGameMessageHandlers()
+	return m
+}
+
+// setupGameMessageHandlers configures and adds all gameMessageHandlers
+func (m *Manager) setupGameMessageHandlers() {
+	m.gameMessageHandlers[ChatMessageType] = func(m GameMessage, c *Client) error {
+		log.Println("manager.setupGameMessageHandlers[ChatMessageType]():", m)
+		return nil
+	}
+}
+
+// makes sure the correct game message goes into the correct game message handler
+func (m *Manager) route(gameMessage GameMessage, c *Client) error {
+	// Check if Handler is present in Map
+	if handler, ok := m.gameMessageHandlers[gameMessage.Type]; ok {
+		// Execute the handler and return any err
+		if err := handler(gameMessage, c); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		return ErrorMessageTypeNotSupported
 	}
 }
 
 // serveWS is a HTTP Handler that the has the Manager that allows connections
 func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request) {
 
-	log.Println("New connection")
+	log.Println("manager.serveWS(): New connection")
 
 	conn, err := websocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -49,21 +79,22 @@ func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request) {
 	client := NewClient(conn, m)
 	// Add the newly created client to the manager
 	m.addClient(client)
+
+	// Start the read / write processes
+	go client.readMessages()
+	go client.writeMessages()
 }
 
 // addClient will add clients to our clientList
 func (m *Manager) addClient(client *Client) {
 	// Lock so we can manipulate
 	m.Lock()
-	log.Println("Adding client")
+	log.Println("manager.addClient(): Adding client")
 	defer m.Unlock()
 
 	// Add Client
 	m.clients[client] = true
 
-	// Start the read / write processes
-	go client.readMessages()
-	go client.writeMessages()
 }
 
 // removeClient will remove the client and clean up
