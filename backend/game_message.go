@@ -16,9 +16,3 @@ type GameMessageHandler func(message GameMessage, c *Client) error
 const (
 	ChatMessageType = "chat-message"
 )
-
-// ChatMessagePayload is the payload sent in the chat-message message
-type ChatMessagePayload struct {
-	Text string `json:"text"`
-	From string `json:"from"`
-}

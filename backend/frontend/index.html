@@ -60,6 +60,17 @@
     }
 
     /**
+     * ChatMessageFromClients
+     * */
+    class ChatMessage {
+        constructor(message, from, sent) {
+            this.text = message;
+            this.from = from;
+            this.sent = sent;
+        }
+    }
+
+    /**
      * routes GameMessages into their correct game message handler based on the type field
      * */
     function route(gameMessage) {
@@ -69,13 +80,29 @@
         }
         switch (gameMessage.type) {
             case "chat-message":
-                console.log("route(): new chat message, payload: " + gameMessage.payload);
+                const chatMessage = Object.assign(new ChatMessage, gameMessage.payload);
+                appendChatMessage(chatMessage);
                 break;
             default:
                 alert("route(): unsupported message type");
                 break;
         }
 
+    }
+    /**
+     * appendChatMessage takes in new messages and adds them to the chat
+     * */
+    function appendChatMessage(chatMessage) {
+        var date = new Date(chatMessage.sent);
+        const formattedMsg = `${chatMessage.from}: ${chatMessage.text} (${date.toLocaleString()})`;
+        // Append Message
+        let textarea = document.getElementById("chat-messages");
+        if (textarea) {
+            textarea.value += "\n" + formattedMsg;
+            textarea.scrollTop = textarea.scrollHeight;  // Scroll to the bottom of the textarea
+        } else {
+            console.error("appendChatMessage(): textarea element not found");
+        }
     }
 
     /**
@@ -96,8 +123,9 @@
     function sendChatMessage() {
         var chatMessage = document.getElementById("chat-message");
         if (chatMessage != null) {
-            console.log("sendChatMessage(), sent: " + chatMessage.value);
-            sendGameMessage("chat-message", chatMessage.value)
+            let chatMsg = new ChatMessage(chatMessage.value, "Player1");
+            console.log("sendChatMessage(), sent: " + chatMsg);
+            sendGameMessage("chat-message", chatMsg)
         }
         return false;
     }
@@ -129,7 +157,7 @@
 
             // Add a listener to the onmessage event
             conn.onmessage = function(evt) {
-                console.log("conn.onmessage(): received: " + evt.data);
+                console.log("conn.onmessage(), received: ", evt.data);
                 const eventData = JSON.parse(evt.data);
                 const gameMessage = Object.assign(new GameMessage, eventData);
                 route(gameMessage);

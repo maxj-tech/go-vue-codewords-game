@@ -44,10 +44,7 @@ func NewManager() *Manager {
 
 // setupGameMessageHandlers configures and adds all gameMessageHandlers
 func (m *Manager) setupGameMessageHandlers() {
-	m.gameMessageHandlers[ChatMessageType] = func(m GameMessage, c *Client) error {
-		log.Println("manager.setupGameMessageHandlers[ChatMessageType]():", m)
-		return nil
-	}
+	m.gameMessageHandlers[ChatMessageType] = ChatMessageHandler
 }
 
 // makes sure the correct game message goes into the correct game message handler
