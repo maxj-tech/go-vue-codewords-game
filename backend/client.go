@@ -83,11 +83,6 @@ func (c *Client) readMessages() {
 			break // fixme better avoid Breaking the connection here
 		}
 
-		// fixme remove this (just to test if the message is broadcasted to all clients)
-		//for client := range c.manager.clients {
-		//	client.egress <- request
-		//}
-
 		// Route the GameMessage
 		if err := c.manager.route(request, c); err != nil {
 			log.Println("client.readMessages(): Error handling GameMessage: ", err)
@@ -96,7 +91,7 @@ func (c *Client) readMessages() {
 }
 
 func (c *Client) pongHandler(pongMsg string) error {
-	log.Println("client.pongHandler(): pong")
+	//log.Println("client.pongHandler(): pong")	// todo  set log levels
 	return c.connection.SetReadDeadline(time.Now().Add(pongWait)) // Current time + Pong Wait time
 }
 
@@ -135,7 +130,7 @@ func (c *Client) writeMessages() {
 			log.Println("client.writeMessages(): marshalled message sent", msg)
 
 		case <-ticker.C:
-			log.Println("client.writeMessages(): ping")
+			//log.Println("client.writeMessages(): ping")
 			// Send the Ping
 			if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				log.Println("client.writeMessages(): failed to send PingMessage", err)

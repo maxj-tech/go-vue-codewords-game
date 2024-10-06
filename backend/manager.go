@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -77,9 +79,51 @@ func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request) {
 	// Add the newly created client to the manager
 	m.addClient(client)
 
+	// Send Welcome Message
+	if err := sendWelcomeMessage(client, m); err != nil {
+		log.Println("serveWS(): failed to send welcome message: ", err)
+		return
+	}
+
 	// Start the read / write processes
 	go client.readMessages()
 	go client.writeMessages()
+}
+
+func sendWelcomeMessage(client *Client, manager *Manager) error {
+
+	welcomeMessageData := []struct {
+		Name string
+		Team string
+		Role string
+	}{
+		{"Ermittler1", "TeamRot", "Ermittler"},
+		{"Chef1", "TeamRot", "Chef"},
+		{"Ermittler2", "TeamBlau", "Ermittler"},
+		{"Chef2", "TeamBlau", "Chef"},
+	}
+	if len(manager.clients) > 4 {
+		return fmt.Errorf("max number of 4 players reached")
+	}
+
+	index := len(manager.clients) - 1
+	welcomeMessage := welcomeMessageData[index]
+
+	data, err := json.Marshal(welcomeMessage)
+	log.Println("manager.sendWelcomeMessage(): Sending welcome message: ", string(data))
+	if err != nil {
+		return fmt.Errorf("failed to marshal broadcast message: %v", err)
+	}
+
+	gameMessage := GameMessage{
+		Type:    "welcome-message",
+		Payload: data,
+	}
+
+	if err := client.connection.WriteJSON(gameMessage); err != nil {
+		log.Println("serveWS(): failed to send welcome message: ", err)
+	}
+	return nil
 }
 
 // addClient will add clients to our clientList

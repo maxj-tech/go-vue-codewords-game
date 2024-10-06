@@ -11,7 +11,8 @@
 <body>
 <div class="center">
     <h1>Codenames</h1>
-    <h3 id="chat-header">Currently in chat: general</h3>
+
+    <div><h4 id="player-data">Spieler: </h4></div>
 
     <!--
     Here is a form that allows us to select what Chatroom to be in
@@ -48,6 +49,12 @@
     // selectedchat is by default General.
     var selectedchat = "general";
 
+    let playerData = {
+        name: "",
+        team: "",
+        role: "",
+    };
+
     /**
      * GameMessage is used to wrap all messages sent and received on the Websocket
      * The type is used as a remote procedure call (RPC) to determine what to do with the payload
@@ -60,7 +67,7 @@
     }
 
     /**
-     * ChatMessageFromClients
+     * ChatMessage
      * */
     class ChatMessage {
         constructor(message, from, sent) {
@@ -68,6 +75,37 @@
             this.from = from;
             this.sent = sent;
         }
+    }
+
+    /**
+     * WelcomeMessage
+     * */
+    class WelcomeMessage {
+        constructor(name, team, role) {
+            this.Name = name;
+            this.Team = team;
+            this.Role = role;
+        }
+    }
+
+    /**
+     * GameStartsMessage
+     * */
+    class GameStartsMessage {
+        constructor(turntoken, begriffe) {
+            this.turntoken = turntoken;
+            this.begriffe = begriffe;
+        }
+    }
+
+    function setPlayerData(welcomeMessage) {
+
+        playerData.name = welcomeMessage.Name;
+        playerData.team = welcomeMessage.Team;
+        playerData.role = welcomeMessage.Role;
+
+        let playerDataElement = document.getElementById("player-data");
+        playerDataElement.textContent = `Spieler: "${welcomeMessage.Name}", ${welcomeMessage.Team}, ${welcomeMessage.Role}`;
     }
 
     /**
@@ -83,6 +121,11 @@
                 const chatMessage = Object.assign(new ChatMessage, gameMessage.payload);
                 appendChatMessage(chatMessage);
                 break;
+            case "welcome-message":
+                const welcomeMessage = Object.assign(new WelcomeMessage, gameMessage.payload);
+                console.log("route(): welcome-message: ", welcomeMessage);
+                setPlayerData(welcomeMessage);
+                break;
             default:
                 alert("route(): unsupported message type");
                 break;
@@ -95,7 +138,6 @@
     function appendChatMessage(chatMessage) {
         var date = new Date(chatMessage.sent);
         const formattedMsg = `${chatMessage.from}: ${chatMessage.text} (${date.toLocaleString()})`;
-        // Append Message
         let textarea = document.getElementById("chat-messages");
         if (textarea) {
             textarea.value += "\n" + formattedMsg;
@@ -140,6 +182,7 @@
         conn.send(JSON.stringify(gameMessage));
     }
 
+
     /**
      * Once the website loads, we want to apply listeners and connect to websocket
      * */
@@ -152,8 +195,10 @@
         // Check if the browser supports WebSocket
         if (window["WebSocket"]) {
             console.log("window.onload(): supports websockets");
+
             // Connect to websocket
             conn = new WebSocket("ws://" + document.location.host + "/ws");
+
 
             // Add a listener to the onmessage event
             conn.onmessage = function(evt) {

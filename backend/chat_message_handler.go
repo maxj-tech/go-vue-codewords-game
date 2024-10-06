@@ -27,13 +27,13 @@ func ChatMessageHandler(gameMessage GameMessage, c *Client) error {
 	}
 
 	// Prepare an Outgoing Message to others
-	var broadMessage ChatMessageWithSentTimeStamp
+	var broadcastChatMessage ChatMessageWithSentTimeStamp
 
-	broadMessage.Sent = time.Now()
-	broadMessage.Text = chatMessagePayload.Text
-	broadMessage.From = chatMessagePayload.From
+	broadcastChatMessage.Sent = time.Now()
+	broadcastChatMessage.Text = chatMessagePayload.Text
+	broadcastChatMessage.From = chatMessagePayload.From
 
-	data, err := json.Marshal(broadMessage)
+	data, err := json.Marshal(broadcastChatMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal broadcast message: %v", err)
 	}
