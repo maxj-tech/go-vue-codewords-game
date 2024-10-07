@@ -1,0 +1,40 @@
+# user specific
+backend/deprecated/**
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Output of the Go compiler
+*.o
+*.a
+
+# Vendor directories (for Go modules)
+vendor/
+
+# Go test binaries
+*.test
+
+# IntelliJ IDEA files
+.idea/
+*.iml
+
+# Dependency directories (may be case sensitive)
+vendor/
+Godeps/
+
+# Go modules files
+go.sum
+
+# Log files
+*.log
+
+# Coverage results
+*.out
+
+# Docker files
+docker-compose.override.yml
+.env
