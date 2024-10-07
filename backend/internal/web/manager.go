@@ -1,4 +1,4 @@
-package main
+package web
 
 import (
 	"encoding/json"
@@ -64,7 +64,7 @@ func (m *Manager) route(gameMessage GameMessage, c *Client) error {
 }
 
 // serveWS is a HTTP Handler that the has the Manager that allows connections
-func (m *Manager) serveWS(w http.ResponseWriter, r *http.Request) {
+func (m *Manager) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	log.Println("manager.serveWS(): New connection")
 

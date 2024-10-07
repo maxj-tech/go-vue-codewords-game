@@ -1,6 +1,8 @@
-package main
+package web
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 // GameMessage is sent / received over the websocket
 type GameMessage struct {

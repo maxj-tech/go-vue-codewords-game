@@ -151,6 +151,11 @@ func TestSetTeamsDisjunkteErmittlerBug(t *testing.T) {
 	}
 }
 
+// todo karten nicht verteilt, Teams nicht gesetzt
+func TestSpielStarten(t *testing.T) {
+	// Karten verteilt, Teams gesetzt?
+}
+
 // todo weitere Fälle: nur Zahl schriftlich, beides mündlich
 func TestChefGibtHinweisBeidesSchriftlich(t *testing.T) {
 	t.Errorf("not yet implemented")

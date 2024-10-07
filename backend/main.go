@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/maxj-tech/go-vue-codewords-game/backend/internal/web"
 	"log"
 	"net/http"
 )
@@ -12,8 +13,8 @@ func main() {
 }
 
 func setupAPI() {
-	manager := NewManager()
+	manager := web.NewManager()
 
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
-	http.HandleFunc("/ws", manager.serveWS)
+	http.HandleFunc("/ws", manager.ServeWS)
 }
