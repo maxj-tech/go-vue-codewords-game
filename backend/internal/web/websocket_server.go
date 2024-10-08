@@ -8,7 +8,7 @@ It also starts the read and write goroutines for the client.
 
 import (
 	"github.com/gorilla/websocket"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"time"
 )
@@ -34,16 +34,16 @@ var (
 
 func ServeWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
-	log.Println("ServeWebsocket: New connection")
+	log.Info("ServeWebsocket: New connection")
 	conn, err := websocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return
 	}
 
 	err = hub.setup(DefaultGameMessageHandlers)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 	}
 
 	// todo 1st limit number of clients,
@@ -53,7 +53,7 @@ func ServeWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 	// fixme feels wrong here
 	if err := hub.sendWelcomeMessage(client); err != nil {
-		log.Println("serveWS(): failed to send welcome message: ", err)
+		log.Error("serveWS(): failed to send welcome message: ", err)
 		return
 	}
 	go client.readMessages()

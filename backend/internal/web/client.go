@@ -3,7 +3,7 @@ package web
 import (
 	"encoding/json"
 	"github.com/gorilla/websocket"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -35,7 +35,7 @@ func newClient(conn *websocket.Conn, hub *Hub, config ClientConfig) *Client {
 // todo if this is supposed to be run as a goroutine, why not internalize the goroutine here?
 func (c *Client) readMessages() {
 	defer func() { // Graceful Close the Connection once this function is done
-		log.Println("client.readMessages(): Closing connection")
+		log.Debug("client.readMessages(): Closing connection")
 		c.hub.removeClient(c)
 	}()
 
@@ -44,7 +44,7 @@ func (c *Client) readMessages() {
 	// Configure wait time for Pong respons: current time + pongWait
 	// This has to be done here to set the first initial timer.
 	if err := c.connection.SetReadDeadline(time.Now().Add(c.config.PongWait)); err != nil {
-		log.Println(err)
+		log.Error(err)
 		return
 	}
 	// Configure how to handle Pong responses
@@ -57,29 +57,29 @@ func (c *Client) readMessages() {
 			// If Connection is closed, we will receive an error here
 			// We only want to log strange errors, but not simple disconnects
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("client.readMessages(): error reading message: %v", err)
+				log.Error("client.readMessages(): error reading message: %v", err)
 			}
 			break // Break the loop to close conn & Cleanup
 		}
 
-		log.Printf("client.readMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
+		log.Debug("client.readMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
 
 		// Marshal incoming data into a GameMessage
 		var request GameMessage
 		if err := json.Unmarshal(payload, &request); err != nil {
-			log.Printf("client.readMessages(): error marshalling message: %v", err)
+			log.Error("client.readMessages(): error marshalling message: %v", err)
 			break // fixme better avoid Breaking the connection here
 		}
 
 		// Route the GameMessage
 		if err := c.hub.route(request, c); err != nil {
-			log.Println("client.readMessages(): Error handling GameMessage: ", err)
+			log.Error("client.readMessages(): Error handling GameMessage: ", err)
 		}
 	}
 }
 
 func (c *Client) pongHandler(pongMsg string) error {
-	//log.Println("client.pongHandler(): pong")	// todo  set log levels
+	log.Debug("client.pongHandler(): pong")
 	return c.connection.SetReadDeadline(time.Now().Add(c.config.PongWait)) // Current time + Pong Wait time
 }
 
@@ -90,7 +90,7 @@ func (c *Client) writeMessages() {
 
 	defer func() { // Graceful close if this triggers a closing
 		ticker.Stop()
-		log.Println("client.writeMessages(): Closing connection")
+		log.Debug("client.writeMessages(): Closing connection")
 		c.hub.removeClient(c)
 	}()
 
@@ -100,28 +100,26 @@ func (c *Client) writeMessages() {
 			if !ok {
 				// tell to frontend that we are closing the connection
 				if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
-					log.Println("client.writeMessages(): connection closed: ", err)
+					log.Warn("client.writeMessages(): connection closed: ", err)
 				}
 				return
 			}
 
 			msg, err := json.Marshal(message)
 			if err != nil {
-				log.Println("client.writeMessages(): error marshalling", err)
-				return // closes the connection, should we really fail here
+				log.Fatal("client.writeMessages(): error marshalling", err)
+				break
 			}
 
-			// Write a Regular text message to the connection
 			if err := c.connection.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Println("client.writeMessages(): failed to send TextMessage", err)
+				log.Error("client.writeMessages(): failed to send TextMessage", err)
 			}
-			log.Println("client.writeMessages(): marshalled message sent", msg)
+			log.Debug("client.writeMessages(): marshalled message sent", msg)
 
 		case <-ticker.C:
-			//log.Println("client.writeMessages(): ping")
-			// Send the Ping
+			log.Debug("client.writeMessages(): ping")
 			if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				log.Println("client.writeMessages(): failed to send PingMessage", err)
+				log.Error("client.writeMessages(): failed to send PingMessage", err)
 				return
 			}
 		}

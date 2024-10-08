@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -86,7 +86,7 @@ func (h *Hub) sendWelcomeMessage(client *Client) error {
 	welcomeMessage := welcomeMessageData[index]
 
 	data, err := json.Marshal(welcomeMessage)
-	log.Println("hub.sendWelcomeMessage(): Sending welcome message: ", string(data))
+	log.Debug("hub.sendWelcomeMessage(): Sending welcome message: ", string(data))
 	if err != nil {
 		return fmt.Errorf("failed to marshal broadcast message: %v", err)
 	}
@@ -97,7 +97,7 @@ func (h *Hub) sendWelcomeMessage(client *Client) error {
 	}
 
 	if err := client.connection.WriteJSON(gameMessage); err != nil {
-		log.Println("serveWS(): failed to send welcome message: ", err)
+		log.Error("serveWS(): failed to send welcome message: ", err)
 	}
 	return nil
 }
@@ -106,7 +106,7 @@ func (h *Hub) addClient(client *Client) {
 	h.Lock()
 	defer h.Unlock()
 
-	log.Println("hub.addClient(): Adding client")
+	log.Debug("hub.addClient(): Adding client")
 	h.clients[client] = true
 }
 
@@ -115,7 +115,10 @@ func (h *Hub) removeClient(client *Client) {
 	defer h.Unlock()
 
 	if _, ok := h.clients[client]; ok {
-		client.connection.Close()
+		err := client.connection.Close()
+		if err != nil {
+			log.Error("hub.removeClient(): error closing connection: ", err)
+		}
 		delete(h.clients, client)
 	}
 }
