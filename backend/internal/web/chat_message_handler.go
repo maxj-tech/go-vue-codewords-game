@@ -40,7 +40,7 @@ func ChatMessageHandler(gameMessage GameMessage, c *Client) error {
 	// Place payload into an Event
 	var outgoingEvent GameMessage
 	outgoingEvent.Payload = data
-	outgoingEvent.Type = ChatMessageType
+	outgoingEvent.Type = ChatMessage
 	// Broadcast to all other Clients
 	for client := range c.hub.clients {
 		client.egress <- outgoingEvent

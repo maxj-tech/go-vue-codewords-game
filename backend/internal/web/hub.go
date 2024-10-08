@@ -1,47 +1,56 @@
 package web
 
+/**
+ * Hub manages clients and their connections todo
+ */
+
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"sync"
+)
 
-	"github.com/gorilla/websocket"
+const (
+	MaxClients = 4 // fixme just temporary
 )
 
 var (
-	/**
-	websocketUpgrader is used to upgrade incoming HTTP requests into a persistent websocket connection
-	*/
-	websocketUpgrader = websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-
 	ErrorMessageTypeNotSupported = errors.New("GameMessage type not supported")
+
+	DefaultGameMessageHandlers = GameMessageHandlers{
+		ChatMessage: ChatMessageHandler,
+	}
 )
 
-// Hub is used to hold references to all Clients Registered, and Broadcasting etc
 type Hub struct {
 	sync.RWMutex        // lock state before editing clients
 	clients             ClientList
-	gameMessageHandlers map[string]GameMessageHandler
+	gameMessageHandlers GameMessageHandlers
 }
 
 func NewHub() *Hub {
 	m := &Hub{
 		clients:             make(ClientList),
-		gameMessageHandlers: make(map[string]GameMessageHandler),
+		gameMessageHandlers: make(GameMessageHandlers),
 	}
-	m.setupGameMessageHandlers()
 	return m
 }
 
-// todo that's pretty much hardcoded, we should make it more configurable
 // setupGameMessageHandlers configures and adds all gameMessageHandlers
-func (h *Hub) setupGameMessageHandlers() {
-	h.gameMessageHandlers[ChatMessageType] = ChatMessageHandler
+func (h *Hub) setup(handlers GameMessageHandlers) error {
+	// todo lock needed here?
+	if handlers == nil || len(handlers) == 0 {
+		return errors.New("invalid GameMessageHandlers: must not be nil or empty")
+	}
+
+	if len(h.gameMessageHandlers) > 0 {
+		return errors.New("game message handlers are already set")
+	}
+
+	h.gameMessageHandlers = handlers
+	return nil
 }
 
 // makes sure the correct game message goes into the correct game message handler
@@ -57,7 +66,7 @@ func (h *Hub) route(gameMessage GameMessage, c *Client) error {
 }
 
 // todo tidy up
-func sendWelcomeMessage(client *Client, manager *Hub) error {
+func (h *Hub) sendWelcomeMessage(client *Client) error {
 
 	welcomeMessageData := []struct {
 		Name string
@@ -69,11 +78,11 @@ func sendWelcomeMessage(client *Client, manager *Hub) error {
 		{"Ermittler2", "TeamBlau", "Ermittler"},
 		{"Chef2", "TeamBlau", "Chef"},
 	}
-	if len(manager.clients) > 4 {
-		return fmt.Errorf("max number of 4 players reached")
+	if len(h.clients) > MaxClients {
+		return fmt.Errorf("max number of %d players reached", MaxClients)
 	}
 
-	index := len(manager.clients) - 1
+	index := len(h.clients) - 1
 	welcomeMessage := welcomeMessageData[index]
 
 	data, err := json.Marshal(welcomeMessage)
