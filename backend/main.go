@@ -13,8 +13,10 @@ func main() {
 }
 
 func setupAPI() {
-	manager := web.NewManager()
+	hub := web.NewHub()
 
 	http.Handle("/", http.FileServer(http.Dir("./frontend")))
-	http.HandleFunc("/ws", manager.ServeWS)
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		web.ServeWebsocket(hub, w, r)
+	})
 }

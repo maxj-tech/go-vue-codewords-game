@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// ChatMessagePayload is the payload sent in the chat-message message
 type ChatMessagePayload struct {
 	Text string `json:"text"`
 	From string `json:"from"`
@@ -43,7 +42,7 @@ func ChatMessageHandler(gameMessage GameMessage, c *Client) error {
 	outgoingEvent.Payload = data
 	outgoingEvent.Type = ChatMessageType
 	// Broadcast to all other Clients
-	for client := range c.manager.clients {
+	for client := range c.hub.clients {
 		client.egress <- outgoingEvent
 	}
 
