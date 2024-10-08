@@ -78,7 +78,7 @@ func (c *Client) readMessages() {
 	}
 }
 
-func (c *Client) pongHandler(pongMsg string) error {
+func (c *Client) pongHandler(string) error {
 	log.Debug("client.pongHandler(): pong")
 	return c.connection.SetReadDeadline(time.Now().Add(c.config.PongWait)) // Current time + Pong Wait time
 }

@@ -5,10 +5,10 @@ import "math/rand/v2"
 type Kartenfarbe int
 
 const (
-	KarteRot     Kartenfarbe = Kartenfarbe(Rot)
-	KarteBlau    Kartenfarbe = Kartenfarbe(Blau)
-	KarteBeige   Kartenfarbe = Kartenfarbe(Beige)
-	KarteSchwarz Kartenfarbe = Kartenfarbe(Schwarz)
+	KarteRot     = Kartenfarbe(Rot)
+	KarteBlau    = Kartenfarbe(Blau)
+	KarteBeige   = Kartenfarbe(Beige)
+	KarteSchwarz = Kartenfarbe(Schwarz)
 )
 
 type Karte struct {

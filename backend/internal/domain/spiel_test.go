@@ -68,7 +68,7 @@ func TestNewSpielFarbenVerteilung(t *testing.T) {
 }
 
 func TestNewSpielAktuellerZugFuerStartendesTeam(t *testing.T) {
-	var startendesTeam Teamfarbe = TeamBlau
+	var startendesTeam = TeamBlau
 	spiel := NewSpiel(startendesTeam)
 	if spiel.AlsNaechstesAmZug != startendesTeam {
 		t.Errorf("expected current turn to be with team %v but got team %v", startendesTeam, spiel.AlsNaechstesAmZug)
@@ -76,7 +76,7 @@ func TestNewSpielAktuellerZugFuerStartendesTeam(t *testing.T) {
 }
 
 func TestNewSpielStartendesTeamRichtigGesetzt(t *testing.T) {
-	var startendesTeam Teamfarbe = TeamRot
+	var startendesTeam = TeamRot
 	spiel := NewSpiel(startendesTeam)
 
 	if spiel.AlsNaechstesAmZug != startendesTeam {
