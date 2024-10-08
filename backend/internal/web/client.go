@@ -1,11 +1,26 @@
 package web
 
+/**
+ * a websocket client. One Client per Connection, i.e. Player
+
+ */
+
 import (
 	"encoding/json"
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
+
+type ClientReadConnectionConfig struct {
+	ReadLimit         int64
+	ReadDeadlineDelta time.Duration
+}
+
+var DefaultClientReadConnectionConfig = ClientReadConnectionConfig{
+	ReadLimit:         256,
+	ReadDeadlineDelta: 60 * time.Second,
+}
 
 type ClientConfig struct {
 	PongWait     time.Duration
@@ -34,64 +49,34 @@ func newClient(conn *websocket.Conn, hub *Hub, config ClientConfig) *Client {
 
 // todo if this is supposed to be run as a goroutine, why not internalize the goroutine here?
 func (c *Client) readMessages() {
-	defer func() { // Graceful Close the Connection once this function is done
-		log.Debug("client.readMessages(): Closing connection")
-		c.hub.removeClient(c)
-	}()
+	defer c.cleanup()
 
-	c.connection.SetReadLimit(256) // maximum message size is 256 bytes
-
-	// Configure wait time for Pong respons: current time + pongWait
-	// This has to be done here to set the first initial timer.
-	if err := c.connection.SetReadDeadline(time.Now().Add(c.config.PongWait)); err != nil {
-		log.Error(err)
-		return
-	}
-	// Configure how to handle Pong responses
-	c.connection.SetPongHandler(c.pongHandler)
+	c.configureConnection(DefaultClientReadConnectionConfig)
 
 	for {
-		messageType, payload, err := c.connection.ReadMessage()
-
+		_, payload, err := c.readMessage()
 		if err != nil {
-			// If Connection is closed, we will receive an error here
-			// We only want to log strange errors, but not simple disconnects
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Error("client.readMessages(): error reading message: %v", err)
-			}
-			break // Break the loop to close conn & Cleanup
+			break
 		}
 
-		log.Debug("client.readMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
-
-		// Marshal incoming data into a GameMessage
-		var request GameMessage
-		if err := json.Unmarshal(payload, &request); err != nil {
-			log.Error("client.readMessages(): error marshalling message: %v", err)
-			break // fixme better avoid Breaking the connection here
+		gameMessage, err := c.makeGameMessage(payload)
+		if err != nil {
+			break
 		}
 
-		// Route the GameMessage
-		if err := c.hub.route(request, c); err != nil {
+		if err := c.hub.route(gameMessage, c); err != nil {
 			log.Error("client.readMessages(): Error handling GameMessage: ", err)
 		}
-	}
-}
 
-func (c *Client) pongHandler(string) error {
-	log.Debug("client.pongHandler(): pong")
-	return c.connection.SetReadDeadline(time.Now().Add(c.config.PongWait)) // Current time + Pong Wait time
+	}
 }
 
 // writeMessages is a process that listens for new messages to output to the Client
 func (c *Client) writeMessages() {
-
 	ticker := time.NewTicker(c.config.PingInterval) // ticker that will send a ping every pingInterval
-
-	defer func() { // Graceful close if this triggers a closing
+	defer func() {
 		ticker.Stop()
-		log.Debug("client.writeMessages(): Closing connection")
-		c.hub.removeClient(c)
+		c.cleanup()
 	}()
 
 	for {
@@ -123,6 +108,41 @@ func (c *Client) writeMessages() {
 				return
 			}
 		}
-
 	}
+}
+
+func (c *Client) readMessage() (messageType int, payload []byte, error error) {
+	messageType, payload, err := c.connection.ReadMessage()
+	if err == nil {
+		log.Debugf("client.readMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
+	} else {
+		log.Error("client.readMessages(): error reading message: %v", err)
+	}
+	return messageType, payload, err
+}
+
+func (c *Client) makeGameMessage(payload []byte) (GameMessage, error) {
+	var gameMessage GameMessage
+	if err := json.Unmarshal(payload, &gameMessage); err != nil {
+		log.Printf("client.readMessages(): error marshalling message: %v", err)
+		return GameMessage{}, err
+	}
+	return gameMessage, nil
+}
+
+func (c *Client) cleanup() {
+	log.Debug("client.cleanup(): Closing connection")
+	c.hub.removeClient(c)
+	if err := c.connection.Close(); err != nil {
+		log.Error("client.cleanup(): error closing connection: ", err)
+	}
+}
+
+func (c *Client) configureConnection(config ClientReadConnectionConfig) {
+	c.connection.SetReadLimit(config.ReadLimit)
+	c.connection.SetPongHandler(func(pongMessage string) error {
+		log.Debug("client: pong")
+		return c.connection.SetReadDeadline(time.Now().Add(config.ReadDeadlineDelta))
+	})
+
 }

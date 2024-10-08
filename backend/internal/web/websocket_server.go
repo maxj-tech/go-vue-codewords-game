@@ -41,7 +41,7 @@ func ServeWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = hub.setup(DefaultGameMessageHandlers)
+	err = hub.setupOnce(DefaultGameMessageHandlers)
 	if err != nil {
 		log.Error(err)
 	}

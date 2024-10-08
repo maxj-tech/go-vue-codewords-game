@@ -38,15 +38,16 @@ func NewHub() *Hub {
 	return m
 }
 
-// setupGameMessageHandlers configures and adds all gameMessageHandlers
-func (h *Hub) setup(handlers GameMessageHandlers) error {
+// setupGameMessageHandlers allows to set up the game message handlers. Only Once!
+func (h *Hub) setupOnce(handlers GameMessageHandlers) error {
 	// todo lock needed here?
 	if handlers == nil || len(handlers) == 0 {
 		return errors.New("invalid GameMessageHandlers: must not be nil or empty")
 	}
 
 	if len(h.gameMessageHandlers) > 0 {
-		return errors.New("game message handlers are already set")
+		log.Info("hub.setupOnce(): GameMessageHandlers already set up")
+		return nil
 	}
 
 	h.gameMessageHandlers = handlers
@@ -65,7 +66,27 @@ func (h *Hub) route(gameMessage GameMessage, c *Client) error {
 	}
 }
 
-// todo tidy up
+func (h *Hub) addClient(client *Client) {
+	h.Lock()
+	defer h.Unlock()
+
+	log.Debug("hub.addClient(): Adding client")
+	h.clients[client] = true
+}
+
+func (h *Hub) removeClient(client *Client) {
+	h.Lock()
+	defer h.Unlock()
+
+	if _, ok := h.clients[client]; ok {
+		log.Debug("hub.removeClient(): Removing client")
+		delete(h.clients, client)
+	} else {
+		log.Warn("hub.removeClient(): Client not found")
+	}
+}
+
+// todo not sure if this is the right place for this function
 func (h *Hub) sendWelcomeMessage(client *Client) error {
 
 	welcomeMessageData := []struct {
@@ -100,25 +121,4 @@ func (h *Hub) sendWelcomeMessage(client *Client) error {
 		log.Error("serveWS(): failed to send welcome message: ", err)
 	}
 	return nil
-}
-
-func (h *Hub) addClient(client *Client) {
-	h.Lock()
-	defer h.Unlock()
-
-	log.Debug("hub.addClient(): Adding client")
-	h.clients[client] = true
-}
-
-func (h *Hub) removeClient(client *Client) {
-	h.Lock()
-	defer h.Unlock()
-
-	if _, ok := h.clients[client]; ok {
-		err := client.connection.Close()
-		if err != nil {
-			log.Error("hub.removeClient(): error closing connection: ", err)
-		}
-		delete(h.clients, client)
-	}
 }
