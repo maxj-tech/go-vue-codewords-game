@@ -86,7 +86,7 @@ func (h *Hub) sendWelcomeMessage(client *Client) error {
 	welcomeMessage := welcomeMessageData[index]
 
 	data, err := json.Marshal(welcomeMessage)
-	log.Println("manager.sendWelcomeMessage(): Sending welcome message: ", string(data))
+	log.Println("hub.sendWelcomeMessage(): Sending welcome message: ", string(data))
 	if err != nil {
 		return fmt.Errorf("failed to marshal broadcast message: %v", err)
 	}
@@ -106,7 +106,7 @@ func (h *Hub) addClient(client *Client) {
 	h.Lock()
 	defer h.Unlock()
 
-	log.Println("manager.addClient(): Adding client")
+	log.Println("hub.addClient(): Adding client")
 	h.clients[client] = true
 }
 
