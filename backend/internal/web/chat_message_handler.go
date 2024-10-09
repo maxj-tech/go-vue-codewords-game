@@ -1,5 +1,11 @@
 package web
 
+/**
+ * ChatMessageHandler routes an incoming chat message to all connected clients in the hub.
+ * It parses the message payload, creates a new GameMessage with the updated timestamp,
+ * and broadcasts it to all clients.
+ */
+
 import (
 	"encoding/json"
 	"fmt"
@@ -7,45 +13,53 @@ import (
 )
 
 type ChatMessagePayload struct {
-	Text string `json:"text"`
-	From string `json:"from"`
-}
-
-// ChatMessageWithSentTimeStamp is returned when responding to chat-message
-type ChatMessageWithSentTimeStamp struct {
-	ChatMessagePayload
+	From string    `json:"from"`
+	Text string    `json:"text"`
 	Sent time.Time `json:"sent"`
 }
 
 // ChatMessageHandler will send out a message to all other participants in the chat
 func ChatMessageHandler(gameMessage GameMessage, c *Client) error {
-	// Marshal Payload into wanted format
-	var chatMessagePayload ChatMessagePayload
-	if err := json.Unmarshal(gameMessage.Payload, &chatMessagePayload); err != nil {
-		return fmt.Errorf("ChatMessageHandler(): bad payload in request: %v", err)
-	}
-
-	// Prepare an Outgoing Message to others
-	var broadcastChatMessage ChatMessageWithSentTimeStamp
-
-	broadcastChatMessage.Sent = time.Now()
-	broadcastChatMessage.Text = chatMessagePayload.Text
-	broadcastChatMessage.From = chatMessagePayload.From
-
-	data, err := json.Marshal(broadcastChatMessage)
+	incomingPayload, err := parseChatMessage(gameMessage)
 	if err != nil {
-		return fmt.Errorf("failed to marshal broadcast message: %v", err)
+		return err
 	}
 
-	// Place payload into an Event
-	var outgoingEvent GameMessage
-	outgoingEvent.Payload = data
-	outgoingEvent.Type = ChatMessage
-	// Broadcast to all other Clients
+	outgoingMessage, err := createGameMessage(incomingPayload)
+	if err != nil {
+		return err
+	}
+
 	for client := range c.hub.clients {
-		client.egress <- outgoingEvent
+		client.egress <- outgoingMessage
+	}
+	return nil
+}
+
+func createGameMessage(incomingPayload ChatMessagePayload) (GameMessage, error) {
+	chatMessagePayload := ChatMessagePayload{
+		From: incomingPayload.From,
+		Text: incomingPayload.Text,
+		Sent: time.Now(),
 	}
 
-	return nil
+	marshalledChatMessagePayload, err := json.Marshal(chatMessagePayload)
+	if err != nil {
+		return GameMessage{},
+			fmt.Errorf("createGameMessage(): failed to marshal chat message payload: %v", err)
+	}
 
+	gameMessage := GameMessage{
+		Type:    ChatMessage,
+		Payload: marshalledChatMessagePayload,
+	}
+	return gameMessage, nil
+}
+
+func parseChatMessage(gameMessage GameMessage) (ChatMessagePayload, error) {
+	var incomingPayload ChatMessagePayload
+	if err := json.Unmarshal(gameMessage.Payload, &incomingPayload); err != nil {
+		return ChatMessagePayload{}, fmt.Errorf("ChatMessageHandler(): bad payload in request: %v", err)
+	}
+	return incomingPayload, nil
 }

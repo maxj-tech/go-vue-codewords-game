@@ -1,8 +1,7 @@
 package web
 
 /**
- * a websocket client. One Client per Connection, i.e. Player
-
+ * Client represents a websocket connection tied to a player and their interaction with the game server.
  */
 
 import (
@@ -32,7 +31,7 @@ type ClientList map[*Client]bool
 type Client struct {
 	connection *websocket.Conn
 	hub        *Hub
-	egress     chan GameMessage // todo "egress"  suggests outgoing messages only. check if that's the case
+	egress     chan GameMessage
 	config     ClientConfig
 }
 
@@ -45,7 +44,7 @@ func newClient(conn *websocket.Conn, hub *Hub, config ClientConfig) *Client {
 	}
 }
 
-func (c *Client) goReadMessages() {
+func (c *Client) startReadMessagesRoutine() {
 	go func() {
 		defer c.cleanup()
 
@@ -63,13 +62,13 @@ func (c *Client) goReadMessages() {
 			}
 
 			if err := c.hub.route(gameMessage, c); err != nil {
-				log.Error("client.goReadMessages(): Error handling GameMessage: ", err)
+				log.WithError(err).Error("client.startReadMessagesRoutine(): Error handling GameMessage")
 			}
 		}
 	}()
 }
 
-func (c *Client) goWriteMessages() {
+func (c *Client) startWriteMessagesRoutine() {
 	go func() {
 		ticker := time.NewTicker(c.config.PingInterval) // ticker that will send a ping every pingInterval
 		defer func() {
@@ -83,14 +82,13 @@ func (c *Client) goWriteMessages() {
 				if !ok {
 					// tell to frontend that we are closing the connection
 					if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
-						log.Warn("client.goWriteMessages(): connection closed: ", err)
-						c.connection.Close() // todo should we add this line
+						log.WithError(err).Warn("client.startWriteMessagesRoutine(): connection closed")
 					}
 					return
 				}
 
 				if ok := c.send(gameMessage); !ok {
-					break
+					return
 				}
 
 			case <-ticker.C:
@@ -105,22 +103,22 @@ func (c *Client) goWriteMessages() {
 func (c *Client) send(gameMessage GameMessage) (ok bool) {
 	msg, err := json.Marshal(gameMessage)
 	if err != nil {
-		log.Errorf("client.send(): error marshalling GameMessage %s", gameMessage, err)
+		log.WithError(err).Errorf("client.send(): error marshalling GameMessage %s", gameMessage)
 		return false
 	}
 
 	if err := c.connection.WriteMessage(websocket.TextMessage, msg); err != nil {
-		log.Error("client.send(): failed to send TextMessage", err)
+		log.WithError(err).Error("client.send(): failed to send TextMessage")
 		return false
 	}
-	log.Debug("client.goWriteMessages(): marshalled gameMessage sent", msg)
+	log.Debug("client.startWriteMessagesRoutine(): marshalled gameMessage sent", msg)
 	return true
 }
 
 func (c *Client) sendPing() (ok bool) {
 	log.Debug("client: ping")
 	if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-		log.Println("client.goWriteMessages(): failed to send PingMessage", err)
+		log.WithError(err).Error("client.startWriteMessagesRoutine(): failed to send PingMessage")
 		return false
 	}
 	return true
@@ -128,18 +126,17 @@ func (c *Client) sendPing() (ok bool) {
 
 func (c *Client) readMessage() (messageType int, payload []byte, err error) {
 	messageType, payload, err = c.connection.ReadMessage()
-	if err == nil {
-		log.Debugf("client.goReadMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
-	} else {
-		log.Error("client.goReadMessages(): error reading message: %v", err)
+	if err != nil {
+		log.WithError(err).Error("client.startReadMessagesRoutine(): error reading message")
 	}
+	log.Debugf("client.startReadMessagesRoutine(): MessageType: %d, Payload: %s \n", messageType, string(payload))
 	return messageType, payload, err
 }
 
 func (c *Client) makeGameMessage(payload []byte) (GameMessage, error) {
 	var gameMessage GameMessage
 	if err := json.Unmarshal(payload, &gameMessage); err != nil {
-		log.Printf("client.goReadMessages(): error marshalling message: %v", err)
+		log.WithError(err).Error("client.startReadMessagesRoutine(): error unmarshalling message")
 		return GameMessage{}, err
 	}
 	return gameMessage, nil
@@ -147,9 +144,9 @@ func (c *Client) makeGameMessage(payload []byte) (GameMessage, error) {
 
 func (c *Client) cleanup() {
 	log.Debug("client.cleanup(): Closing connection")
-	c.hub.removeClient(c)
+	c.hub.removeClient(c) // todo error handling?
 	if err := c.connection.Close(); err != nil {
-		log.Error("client.cleanup(): error closing connection: ", err)
+		log.WithError(err).Error("client.cleanup(): error closing connection")
 	}
 }
 

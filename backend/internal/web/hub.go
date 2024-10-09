@@ -1,7 +1,8 @@
 package web
 
 /**
- * Hub manages clients and their connections todo
+ * Hub manages the active clients and their connections, allowing
+ * broadcasting and routing of messages between them.
  */
 
 import (
@@ -40,7 +41,9 @@ func NewHub() *Hub {
 
 // setupGameMessageHandlers allows to set up the game message handlers. Only Once!
 func (h *Hub) setupOnce(handlers GameMessageHandlers) error {
-	// todo lock needed here?
+	h.Lock()
+	defer h.Unlock()
+
 	if handlers == nil || len(handlers) == 0 {
 		return errors.New("invalid GameMessageHandlers: must not be nil or empty")
 	}
@@ -80,6 +83,7 @@ func (h *Hub) removeClient(client *Client) {
 
 	if _, ok := h.clients[client]; ok {
 		log.Debug("hub.removeClient(): Removing client")
+		close(client.egress)
 		delete(h.clients, client)
 	} else {
 		log.Warn("hub.removeClient(): Client not found")

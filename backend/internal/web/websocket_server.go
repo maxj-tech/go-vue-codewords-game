@@ -1,10 +1,10 @@
 package web
 
-/*
-ServeWebsocket handles incoming websocket requests, upgrades the HTTP connection
-to a websocket connection, and initializes a new client.
-It also starts the read and write goroutines for the client.
-*/
+/**
+ * ServeWebsocket handles incoming websocket requests, upgrades the HTTP connection
+ * to a websocket connection, and initializes a new client.
+ * It also starts the read and write goroutines for the client.
+ */
 
 import (
 	"github.com/gorilla/websocket"
@@ -56,6 +56,6 @@ func ServeWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Error("serveWS(): failed to send welcome message: ", err)
 		return
 	}
-	client.goReadMessages()
-	client.goWriteMessages()
+	client.startReadMessagesRoutine()
+	client.startWriteMessagesRoutine()
 }
