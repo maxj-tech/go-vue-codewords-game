@@ -15,21 +15,10 @@
     <div><h4 id="player-data">Spieler: </h4></div>
 
     <!--
-    Here is a form that allows us to select what Chatroom to be in
-    -->
-    <form id="chatroom-selection">
-        <label for="chatroom">Chatroom:</label>
-        <input type="text" id="chatroom" name="chatroom"><br><br>
-        <input type="submit" value="Change chatroom">
-    </form>
-
-    <br>
-    <!--
     Textarea to show messages from users
     -->
     <textarea class="message-area" id="chat-messages" readonly name="chat-messages" rows="4" cols="50"
               placeholder="all received messages will appear here"></textarea>
-
     <br>
     <!--
     Chatroom-message form is used to send messages
@@ -41,13 +30,8 @@
     </form>
 </div>
 
-<!--
-    Javascript that is used to Connect to Websocket and Handle New messages
--->
-<script type="text/javascript">
 
-    // selectedchat is by default General.
-    var selectedchat = "general";
+<script type="text/javascript">
 
     let playerData = {
         name: "",
@@ -67,7 +51,7 @@
     }
 
     /**
-     * ChatMessage
+     * ChatMessage goes into the payload of a GameMessage - a kind of more specific sub message
      * */
     class ChatMessage {
         constructor(message, from, sent) {
@@ -148,24 +132,12 @@
     }
 
     /**
-     * changeChatRoom will update the value of selectedchat
-     * and also notify the server that it changes chatroom
-     * */
-    function changeChatRoom() {
-        // Change Header to reflect the Changed chatroom
-        var newchat = document.getElementById("chatroom");
-        if (newchat != null && newchat.value != selectedchat) {
-            console.log(newchat);
-        }
-        return false;
-    }
-    /**
      * sendChatMessage will send a chat message onto the Websocket
      * */
     function sendChatMessage() {
         var chatMessage = document.getElementById("chat-message");
         if (chatMessage != null) {
-            let chatMsg = new ChatMessage(chatMessage.value, "Player1");
+            let chatMsg = new ChatMessage(chatMessage.value, playerData.name);
             console.log("sendChatMessage(), sent: " + chatMsg);
             sendGameMessage("chat-message", chatMsg)
         }
@@ -189,7 +161,6 @@
     window.onload = function () {
         // Apply our listener functions to the submit event on both forms
         // we do it this way to avoid redirects
-        document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
         document.getElementById("chat-message-form").onsubmit = sendChatMessage;
 
         // Check if the browser supports WebSocket
