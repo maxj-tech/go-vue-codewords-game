@@ -27,10 +27,8 @@ type ClientConfig struct {
 	PingInterval time.Duration
 }
 
-// ClientList is a map used to help manage a map of clients
 type ClientList map[*Client]bool
 
-// Client is a websocket client, basically a frontend visitor
 type Client struct {
 	connection *websocket.Conn
 	hub        *Hub
@@ -47,76 +45,93 @@ func newClient(conn *websocket.Conn, hub *Hub, config ClientConfig) *Client {
 	}
 }
 
-// todo if this is supposed to be run as a goroutine, why not internalize the goroutine here?
-func (c *Client) readMessages() {
-	defer c.cleanup()
+func (c *Client) goReadMessages() {
+	go func() {
+		defer c.cleanup()
 
-	c.configureConnection(DefaultClientReadConnectionConfig)
+		c.configureConnection(DefaultClientReadConnectionConfig)
 
-	for {
-		_, payload, err := c.readMessage()
-		if err != nil {
-			break
-		}
-
-		gameMessage, err := c.makeGameMessage(payload)
-		if err != nil {
-			break
-		}
-
-		if err := c.hub.route(gameMessage, c); err != nil {
-			log.Error("client.readMessages(): Error handling GameMessage: ", err)
-		}
-
-	}
-}
-
-// writeMessages is a process that listens for new messages to output to the Client
-func (c *Client) writeMessages() {
-	ticker := time.NewTicker(c.config.PingInterval) // ticker that will send a ping every pingInterval
-	defer func() {
-		ticker.Stop()
-		c.cleanup()
-	}()
-
-	for {
-		select {
-		case message, ok := <-c.egress: // ok will be false if the egress channel is closed
-			if !ok {
-				// tell to frontend that we are closing the connection
-				if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
-					log.Warn("client.writeMessages(): connection closed: ", err)
-				}
-				return
-			}
-
-			msg, err := json.Marshal(message)
+		for {
+			_, payload, err := c.readMessage()
 			if err != nil {
-				log.Fatal("client.writeMessages(): error marshalling", err)
 				break
 			}
 
-			if err := c.connection.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Error("client.writeMessages(): failed to send TextMessage", err)
+			gameMessage, err := c.makeGameMessage(payload)
+			if err != nil {
+				break
 			}
-			log.Debug("client.writeMessages(): marshalled message sent", msg)
 
-		case <-ticker.C:
-			log.Debug("client.writeMessages(): ping")
-			if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
-				log.Error("client.writeMessages(): failed to send PingMessage", err)
-				return
+			if err := c.hub.route(gameMessage, c); err != nil {
+				log.Error("client.goReadMessages(): Error handling GameMessage: ", err)
 			}
 		}
-	}
+	}()
 }
 
-func (c *Client) readMessage() (messageType int, payload []byte, error error) {
-	messageType, payload, err := c.connection.ReadMessage()
+func (c *Client) goWriteMessages() {
+	go func() {
+		ticker := time.NewTicker(c.config.PingInterval) // ticker that will send a ping every pingInterval
+		defer func() {
+			ticker.Stop()
+			c.cleanup()
+		}()
+
+		for {
+			select {
+			case gameMessage, ok := <-c.egress: // ok will be false if the egress channel is closed
+				if !ok {
+					// tell to frontend that we are closing the connection
+					if err := c.connection.WriteMessage(websocket.CloseMessage, nil); err != nil {
+						log.Warn("client.goWriteMessages(): connection closed: ", err)
+						c.connection.Close() // todo should we add this line
+					}
+					return
+				}
+
+				if ok := c.send(gameMessage); !ok {
+					break
+				}
+
+			case <-ticker.C:
+				if ok := c.sendPing(); !ok {
+					return
+				}
+			}
+		}
+	}()
+}
+
+func (c *Client) send(gameMessage GameMessage) (ok bool) {
+	msg, err := json.Marshal(gameMessage)
+	if err != nil {
+		log.Errorf("client.send(): error marshalling GameMessage %s", gameMessage, err)
+		return false
+	}
+
+	if err := c.connection.WriteMessage(websocket.TextMessage, msg); err != nil {
+		log.Error("client.send(): failed to send TextMessage", err)
+		return false
+	}
+	log.Debug("client.goWriteMessages(): marshalled gameMessage sent", msg)
+	return true
+}
+
+func (c *Client) sendPing() (ok bool) {
+	log.Debug("client: ping")
+	if err := c.connection.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+		log.Println("client.goWriteMessages(): failed to send PingMessage", err)
+		return false
+	}
+	return true
+}
+
+func (c *Client) readMessage() (messageType int, payload []byte, err error) {
+	messageType, payload, err = c.connection.ReadMessage()
 	if err == nil {
-		log.Debugf("client.readMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
+		log.Debugf("client.goReadMessages(): MessageType: %d, Payload: %s \n", messageType, string(payload))
 	} else {
-		log.Error("client.readMessages(): error reading message: %v", err)
+		log.Error("client.goReadMessages(): error reading message: %v", err)
 	}
 	return messageType, payload, err
 }
@@ -124,7 +139,7 @@ func (c *Client) readMessage() (messageType int, payload []byte, error error) {
 func (c *Client) makeGameMessage(payload []byte) (GameMessage, error) {
 	var gameMessage GameMessage
 	if err := json.Unmarshal(payload, &gameMessage); err != nil {
-		log.Printf("client.readMessages(): error marshalling message: %v", err)
+		log.Printf("client.goReadMessages(): error marshalling message: %v", err)
 		return GameMessage{}, err
 	}
 	return gameMessage, nil

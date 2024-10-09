@@ -56,6 +56,6 @@ func ServeWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Error("serveWS(): failed to send welcome message: ", err)
 		return
 	}
-	go client.readMessages()
-	go client.writeMessages()
+	client.goReadMessages()
+	client.goWriteMessages()
 }
