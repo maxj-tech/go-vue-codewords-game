@@ -1,5 +1,5 @@
-# user specific
-backend/deprecated/**
+# custom
+deprecated/
 
 # Binaries for programs and plugins
 *.exe
