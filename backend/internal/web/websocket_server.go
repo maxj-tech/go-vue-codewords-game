@@ -56,6 +56,13 @@ func ServeWebsocket(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		log.Error("serveWS(): failed to send welcome message: ", err)
 		return
 	}
+
+	// fixme feels wrong here
+	if err := hub.sendGameStartsMessage(client); err != nil {
+		log.Error("serveWS(): failed to send game starts message: ", err)
+		return
+	}
+
 	client.startReadMessagesRoutine()
 	client.startWriteMessagesRoutine()
 }

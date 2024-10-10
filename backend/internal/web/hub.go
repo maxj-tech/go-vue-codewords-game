@@ -113,7 +113,7 @@ func (h *Hub) sendWelcomeMessage(client *Client) error {
 	data, err := json.Marshal(welcomeMessage)
 	log.Debug("hub.sendWelcomeMessage(): Sending welcome message: ", string(data))
 	if err != nil {
-		return fmt.Errorf("failed to marshal broadcast message: %v", err)
+		return fmt.Errorf("failed to marshal message: %v", err)
 	}
 
 	gameMessage := GameMessage{
@@ -122,7 +122,49 @@ func (h *Hub) sendWelcomeMessage(client *Client) error {
 	}
 
 	if err := client.connection.WriteJSON(gameMessage); err != nil {
-		log.Error("serveWS(): failed to send welcome message: ", err)
+		log.Error("hub.sendWelcomeMessage(): failed to send welcome message: ", err)
+	}
+	return nil
+}
+
+// todo not sure if this is the right place for this function
+func (h *Hub) sendGameStartsMessage(client *Client) error {
+
+	type Karte struct {
+		Begriff        string
+		Farbe          string
+		IstGetippt     bool
+		IstAusgewaehlt bool
+	}
+
+	type GameStartsMessage struct {
+		Karten []Karte
+	}
+
+	karten := []Karte{
+		{"Begriff1", "Rot", false, false},
+		{"Begriff2", "Blau", false, false},
+		{"Begriff3", "Beige", false, false},
+		{"Begriff4", "Schwarz", false, false},
+	}
+
+	gameStartsMessage := GameStartsMessage{
+		Karten: karten,
+	}
+
+	data, err := json.Marshal(gameStartsMessage)
+	log.Debug("hub.sendGameStartsMessage(): Sending game starts message: ", string(data))
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %v", err)
+	}
+
+	gameMessage := GameMessage{
+		Type:    "game-starts-message",
+		Payload: data,
+	}
+
+	if err := client.connection.WriteJSON(gameMessage); err != nil {
+		log.Error("hub.sendGameStartsMessage(): failed to send game starts message: ", err)
 	}
 	return nil
 }

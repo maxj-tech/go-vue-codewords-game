@@ -15,6 +15,41 @@
     <div><h4 id="player-data">Spieler: </h4></div>
 
     <!--
+    Karten-Tabelle: Begriff, Farbe, IstGetippt, IstAusgewahlt
+    -->
+    <div id="karten-container" style="display: none;">
+        <h2>Karten</h2>
+        <table id="karten-table">
+            <thead>
+            <tr>
+                <th>Begriff</th>
+                <th>Farbe</th>
+                <th>Ist Getippt</th>
+                <th>Ist Ausgewählt</th>
+            </tr>
+            </thead>
+            <tbody id="karten-table-body">
+            </tbody>
+        </table>
+        <button id="tipp-button" disabled>Tippen</button>
+        <!--
+        // todo button "Tippen":
+        // beim klick auf den button soll ein TippMessage-Objekt erstellt und an den Server geschickt werden
+        // das TippMessage-Objekt soll den Begriff und den Spieler enthalten
+        // der Spieler ist der Name des Spielers, der den Tipp abgibt
+        // der Begriff ist der Begriff, der getippt wird
+        // nach dem Absenden des Tipps soll der Begriff in der Tabelle als getippt markiert werden
+        // nach dem Absenden des Tipps soll die Auswahl des Begriffs in der Tabelle aufgehoben werden
+        // ein getippter Begriff soll nicht mehr auswählbar sein
+        // wenn der Begriff richtig getippt wurde, soll die Farbe der Karte in der Tabelle angezeigt werden
+        // Änderung: Die Farben der Karten sollen für noch nicht getippte Karten nicht angezeigt werden
+        // der Button "Tippen" soll nur aktiv sein, wenn ein Begriff ausgewählt ist
+        -->
+
+    </div>
+
+    <br>
+    <!--
     Textarea to show messages from users
     -->
     <textarea class="message-area" id="chat-messages" readonly name="chat-messages" rows="4" cols="50"
@@ -38,6 +73,8 @@
         team: "",
         role: "",
     };
+
+    let kartenDaten = [];
 
     /**
      * GameMessage is used to wrap all messages sent and received on the Websocket
@@ -76,11 +113,40 @@
      * GameStartsMessage
      * */
     class GameStartsMessage {
-        constructor(turntoken, begriffe) {
+        constructor(turntoken, karten) {
             this.turntoken = turntoken;
-            this.begriffe = begriffe;
+            this.Karten = karten;
         }
     }
+
+        class Karte {
+            constructor(begriff, farbe, istGetippt, istAusgewahlt ) {
+                this.Begriff = begriff;
+                this.Farbe = farbe;
+                this.IstGetippt = istGetippt,
+                this.IstAusgewahlt = istAusgewahlt
+            }
+        }
+
+    function setKartenData(gameStartsMessage) {
+        kartenDaten = gameStartsMessage.Karten;
+
+        // Füge jedem Kartendatum eine Eigenschaft "istFarbeAngezeigt" hinzu
+        kartenDaten.forEach(karte => {
+            karte.istFarbeAngezeigt = false;
+        });
+
+        populateKartenTable(kartenDaten);
+    }
+
+    class TippMessage {
+        constructor(begriff, spieler) {
+            this.Begriff = begriff;
+            this.Spieler = spieler;
+        }
+    }
+
+
 
     function setPlayerData(welcomeMessage) {
 
@@ -110,6 +176,18 @@
                 console.log("route(): welcome-message: ", welcomeMessage);
                 setPlayerData(welcomeMessage);
                 break;
+
+            case "game-starts-message":
+                const gameStartsMessage = Object.assign(new GameStartsMessage, gameMessage.payload);
+                console.log("route(): game-starts: ", gameStartsMessage);
+
+                // Show the Karten container
+                document.getElementById("karten-container").style.display = "block";
+
+                // Generate and populate the table with cards
+                populateKartenTable(gameStartsMessage.Karten);
+                break;
+
             default:
                 alert("route(): unsupported message type");
                 break;
@@ -154,6 +232,74 @@
         conn.send(JSON.stringify(gameMessage));
     }
 
+    function populateKartenTable(karten) {
+        const tableBody = document.getElementById("karten-table-body");
+        console.log("populateKartenTable(): karten: ", karten);
+        // Clear any existing rows
+        tableBody.innerHTML = "";
+
+        for (const karte of karten) {
+            const tableRow = document.createElement("tr");
+
+            const termCell = document.createElement("td");
+            termCell.textContent = karte.Begriff;
+            tableRow.appendChild(termCell);
+
+            const colorCell = document.createElement("td");
+            colorCell.textContent = karte.istFarbeAngezeigt ? karte.Farbe : "?";
+            tableRow.appendChild(colorCell);
+
+            const isGuessedCell = document.createElement("td");
+            isGuessedCell.textContent = karte.IstGetippt ? "Ja" : "Nein";
+            tableRow.appendChild(isGuessedCell);
+
+            const isSelectedCell = document.createElement("td");
+            const isSelectedCheckbox = document.createElement("input");
+            isSelectedCheckbox.type = "checkbox";
+            isSelectedCheckbox.addEventListener("change", handleSelectedChange);
+            isSelectedCell.appendChild(isSelectedCheckbox);
+            tableRow.appendChild(isSelectedCell);
+
+            tableBody.appendChild(tableRow);
+        }
+    }
+
+    function handleSelectedChange(event) {
+        const selectedCheckbox = event.target;
+        const tableRow = selectedCheckbox.parentElement.parentElement;
+
+        // Deselect any previously selected checkbox
+        const tableBody = document.getElementById("karten-table-body");
+        for (const row of tableBody.children) {
+            const checkbox = row.querySelector("input[type=checkbox]");
+            if (checkbox !== selectedCheckbox) {
+                checkbox.checked = false;
+            }
+        }
+
+        // Enable the "Tippen" button only if a checkbox is selected
+        const tippButton = document.getElementById("tipp-button");
+        tippButton.disabled = !selectedCheckbox.checked;
+    }
+
+    function sendTipp() {
+        // Finde den ausgewählten Begriff
+        const selectedRow = document.querySelector("#karten-table-body tr input[type=checkbox]:checked").parentElement.parentElement;
+        const Begriff = selectedRow.querySelector("td:nth-child(1)").textContent;
+
+        // Erstelle eine TippMessage
+        const tippMessage = new TippMessage(Begriff, playerData.name);
+
+        // Sende die TippMessage
+        sendGameMessage("tipp-message", tippMessage);
+
+        // Aktualisiere die UI (Beispielhafte Implementierung)
+        selectedRow.querySelector("td:nth-child(3)").textContent = "Ja"; // Markiere als getippt
+        selectedRow.querySelector("input[type=checkbox]").disabled = true; // Deaktiviere Checkbox
+        tippButton.disabled = true; // Deaktiviere Tipp-Button
+    }
+
+
 
     /**
      * Once the website loads, we want to apply listeners and connect to websocket
@@ -162,6 +308,9 @@
         // Apply our listener functions to the submit event on both forms
         // we do it this way to avoid redirects
         document.getElementById("chat-message-form").onsubmit = sendChatMessage;
+
+        const tippButton = document.getElementById("tipp-button");
+        tippButton.addEventListener("click", sendTipp);
 
         // Check if the browser supports WebSocket
         if (window["WebSocket"]) {
